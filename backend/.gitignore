@@ -1,0 +1,19 @@
+# Service account files
+service-account.json
+firebase-service-account.json
+gen-lang-client-*.json
+*.json  # Except requirements.txt and other needed JSONs
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+ENV/
+
+# Environment
+.env

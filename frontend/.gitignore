@@ -1,23 +1,22 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Service account keys - NEVER COMMIT THESE!
+service-account.json
+firebase-service-account.json
+gen-lang-client-*.json  # This catches all Google service account files
+*.json  # Actually, be careful with this - might block needed JSON files
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
+# Better to be specific:
+google-service-account.json
+google-credentials.json
+firebase-credentials.json
+credentials.json
 
-# testing
-/coverage
-
-# production
-/build
-
-# misc
-.DS_Store
+# Environment files
+.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env*.local
 
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# VS Code settings
+.vscode/
