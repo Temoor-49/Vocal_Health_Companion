@@ -19,6 +19,7 @@ const Statistics = ({ backendUrl }) => {
   const [statistics, setStatistics] = useState(null);
   const [recentSessions, setRecentSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [analysisResult, setAnalysisResult] = useState(null); // State for analysis result
 
   const fetchStatistics = async () => {
     try {
@@ -34,6 +35,11 @@ const Statistics = ({ backendUrl }) => {
       const sessionsData = await sessionsResponse.json();
       setRecentSessions(sessionsData.sessions || []);
       
+      // Fetch analysis result (if applicable)
+      const analysisResponse = await fetch(`${backendUrl}/api/latest-analysis`);
+      const analysisData = await analysisResponse.json();
+      setAnalysisResult(analysisData);
+
     } catch (error) {
       console.error('Error fetching statistics:', error);
     } finally {
@@ -139,7 +145,7 @@ const Statistics = ({ backendUrl }) => {
               sx={{ 
                 p: 2, 
                 mb: 1,
-                bgcolor: index === 0 ? '#f0f7ff' : 'white'
+                bgcolor: index === 0 ? '#7C3AED' : '#7C3AED'
               }}
             >
               <Typography variant="body2">
@@ -170,6 +176,21 @@ const Statistics = ({ backendUrl }) => {
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
           No practice sessions yet. Record your first speech!
         </Typography>
+      )}
+
+      {/* Analysis Display Section */}
+      {analysisResult && (
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Latest Analysis
+          </Typography>
+          {/* Show analysis results here */}
+          <Paper sx={{ p: 2, bgcolor: '#7C3AED' }}>
+            <Typography variant="body1">Clarity Score: {analysisResult.clarity_score}/10</Typography>
+            <Typography variant="body1">Confidence Score: {analysisResult.confidence_score}/10</Typography>
+            <Typography variant="body1">Feedback: {analysisResult.feedback}</Typography>
+          </Paper>
+        </Box>
       )}
 
       {statistics?.is_mock && (
