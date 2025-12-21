@@ -1,4 +1,5 @@
 # backend/main.py
+import os
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -29,9 +30,17 @@ app = FastAPI(title="Vocal Health Companion API")
 # ---------------------------------------------------------
 # CORS Settings
 # ---------------------------------------------------------
+# Update CORS middleware in main.py
+
+# Get frontend URL from environment
+frontend_url = os.getenv("FRONTEND_URL", "https://vocal-health-companion.web.app")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL, "http://localhost:3000"],
+    allow_origins=[
+        frontend_url,
+        "http://localhost:3000",  # Keep for local development
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
