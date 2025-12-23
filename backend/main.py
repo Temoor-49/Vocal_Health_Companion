@@ -30,21 +30,29 @@ app = FastAPI(title="Vocal Health Companion API")
 # ---------------------------------------------------------
 # CORS Settings
 # ---------------------------------------------------------
-# Update CORS middleware in main.py
-
-# Get frontend URL from environment
-frontend_url = os.getenv("FRONTEND_URL", "https://vocal-health-companion.web.app")
+# Get frontend URL from environment or use defaults
+frontend_url = os.getenv("FRONTEND_URL", "https://gen-lang-client-0181311027.web.app")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        frontend_url,
-        "http://localhost:3000",  # Keep for local development
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://gen-lang-client-0181311027.web.app",
+        "https://gen-lang-client-0181311027.firebaseapp.com",
+        "https://gen-lang-client-0181311027.web.app/",  # With slash
+        frontend_url  # Your actual frontend URL from env
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
+
+@app.options("/{path:path}")
+async def options_handler(path: str):
+    """Handle CORS preflight requests"""
+    return {"message": "CORS allowed"}
 
 # ---------------------------------------------------------
 # Root Endpoint

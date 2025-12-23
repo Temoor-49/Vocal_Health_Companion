@@ -21,12 +21,12 @@ const Footer = () => {
       <Box sx={{ mb: 2 }}>
         <IconButton 
           size="small" 
-          href="https://github.com/yourusername/vocal-health-companion" 
+          href="https://github.com/Temoor-49/Vocal_Health_Companion.git" 
           target="_blank"
         >
           <GitHubIcon />
         </IconButton>
-        <IconButton size="small" href="mailto:your-email@example.com">
+        <IconButton size="small" href="mailto:temoorh48@gmail.com">
           <EmailIcon />
         </IconButton>
       </Box>
