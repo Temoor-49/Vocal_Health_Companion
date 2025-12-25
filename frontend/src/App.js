@@ -1,4 +1,4 @@
-// frontend/src/App.js - UPDATED VERSION
+// frontend/src/App.js - UPDATED VERSION WITH AI CONVERSATION COACH FIRST
 import React, { useState, useEffect } from 'react';
 import { 
   Container, 
@@ -20,22 +20,16 @@ import {
 import { ThemeProvider } from '@mui/material/styles';
 import theme from './theme';
 
-
+// Import Components
 import VoiceRecorder from './components/VoiceRecorder';
 import Statistics from './components/Statistics';
-
-
-
-import FeatureCards from './components/featurecards'; // Capital F
+import FeatureCards from './components/featurecards';
 import DemoWalkthrough from './components/DemoWalkthrough';
 import ProgressChart from './components/ProgressChart';
-
-// Import NEW Components
 import VoiceSelector from './components/VoiceSelector';
 import PracticeTemplates from './components/PracticeTemplates';
 import ExportReports from './components/ExportsReports';
-
-
+import ConversationCoach from './components/ConversationCoach'; // NEW IMPORT
 
 // Import Icons
 import MicIcon from '@mui/icons-material/Mic';
@@ -47,6 +41,7 @@ import EmailIcon from '@mui/icons-material/Email';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import DescriptionIcon from '@mui/icons-material/Description';
+import ChatIcon from '@mui/icons-material/Chat'; // NEW ICON
 
 function App() {
   const [backendStatus, setBackendStatus] = useState('Checking...');
@@ -55,10 +50,10 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   
-  // Update activeTab to load from localStorage
+  // Update activeTab to load from localStorage - AI Coach is now tab 0
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = localStorage.getItem('vocalCoach_activeTab');
-    return savedTab ? parseInt(savedTab) : 0;
+    return savedTab ? parseInt(savedTab) : 0; // Default to 0 (AI Conversation Coach)
   });
   
   const [selectedVoice, setSelectedVoice] = useState(() => {
@@ -133,13 +128,13 @@ function App() {
     // Switch to analysis tab automatically only on first analysis
     const hasSeenAnalysis = localStorage.getItem('vocalCoach_hasSeenAnalysis');
     if (!hasSeenAnalysis) {
-      setActiveTab(1);
+      setActiveTab(2); // Now Analysis Results is tab 2
       localStorage.setItem('vocalCoach_hasSeenAnalysis', 'true');
     }
   };
 
   const handleStartPractice = () => {
-    setActiveTab(0); // Switch to Voice Practice tab
+    setActiveTab(1); // Now Voice Practice is tab 1
   };
 
   const handleVoiceSelect = (voiceId) => {
@@ -150,7 +145,7 @@ function App() {
   const handleTemplateSelect = (template) => {
     setSelectedTemplate(template);
     // Switch to voice practice tab when template is selected
-    setActiveTab(0);
+    setActiveTab(1); // Now Voice Practice is tab 1
     console.log('Selected template:', template);
   };
 
@@ -241,7 +236,7 @@ function App() {
           <Button 
             variant="contained" 
             size="large"
-            onClick={handleStartPractice}
+            onClick={() => setActiveTab(0)} // Directly open AI Conversation Coach
             sx={{ 
               bgcolor: 'white', 
               color: '#4F46E5',
@@ -250,44 +245,56 @@ function App() {
               py: 1.5,
               '&:hover': { bgcolor: '#f0f0f0' }
             }}
-            startIcon={<MicIcon />}
+            startIcon={<ChatIcon />}
           >
-            Start Free Practice Session
+            Start AI Conversation
           </Button>
         </Paper>
 
-        {/* Voice Practice Section with Tabs */}
+        {/* Voice Practice Section with Tabs - AI CONVERSATION COACH FIRST */}
         <Paper elevation={2} sx={{ mb: 4, borderRadius: 2 }}>
           <Tabs 
             value={activeTab} 
             onChange={(e, newValue) => setActiveTab(newValue)}
-            variant="fullWidth"
+            variant="scrollable"
+            scrollButtons="auto"
             sx={{ 
               borderBottom: 1, 
               borderColor: 'divider',
-              '& .MuiTab-root': { py: 2 }
+              '& .MuiTab-root': { py: 2, minWidth: 'auto', px: 2 }
             }}
           >
+            {/* TAB 0: AI CONVERSATION COACH - NOW FIRST */}
+            <Tab 
+              icon={<ChatIcon />} 
+              label="AI Conversation Coach" 
+              iconPosition="start"
+            />
+            {/* TAB 1: VOICE PRACTICE */}
             <Tab 
               icon={<MicIcon />} 
               label="Voice Practice" 
               iconPosition="start"
             />
+            {/* TAB 2: ANALYSIS RESULTS */}
             <Tab 
               icon={<AnalyticsIcon />} 
               label="Analysis Results" 
               iconPosition="start"
             />
+            {/* TAB 3: PROGRESS DASHBOARD */}
             <Tab 
               icon={<AssessmentIcon />} 
               label="Progress Dashboard" 
               iconPosition="start"
             />
+            {/* TAB 4: VOICE SETTINGS */}
             <Tab 
               icon={<VolumeUpIcon />} 
               label="Voice Settings" 
               iconPosition="start"
             />
+            {/* TAB 5: REPORTS */}
             <Tab 
               icon={<DescriptionIcon />} 
               label="Reports" 
@@ -295,8 +302,24 @@ function App() {
             />
           </Tabs>
 
-          {/* Tab 1: Voice Practice */}
+          {/* TAB 0: AI CONVERSATION COACH - NOW FIRST */}
           {activeTab === 0 && (
+            <Box sx={{ p: 3 }}>
+              <Typography variant="h5" gutterBottom color="primary" sx={{ mb: 3 }}>
+                💬 AI Conversation Coach
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Have a natural conversation with your AI speaking coach. Press and hold to speak, release to send.
+              </Typography>
+              <ConversationCoach 
+                backendUrl={backendUrl}
+                onAnalysisComplete={handleAnalysisComplete}
+              />
+            </Box>
+          )}
+
+          {/* TAB 1: VOICE PRACTICE */}
+          {activeTab === 1 && (
             <Box sx={{ p: 3 }}>
               <Typography variant="h5" gutterBottom color="primary" sx={{ mb: 3 }}>
                 🎤 Voice Practice Session
@@ -317,11 +340,14 @@ function App() {
             </Box>
           )}
 
-          {/* Tab 2: Analysis Results */}
-          {activeTab === 1 && (
+          {/* TAB 2: ANALYSIS RESULTS */}
+          {activeTab === 2 && (
             <Box sx={{ p: 3 }}>
+              <Typography variant="h5" gutterBottom color="primary" sx={{ mb: 3 }}>
+                📊 Analysis Results
+              </Typography>
               {analysisResult ? (
-                <Statistics backendUrl={backendUrl} />
+                <Statistics backendUrl={backendUrl} analysisResult={analysisResult} />
               ) : (
                 <Box sx={{ textAlign: 'center', py: 6 }}>
                   <AnalyticsIcon sx={{ fontSize: 60, color: 'grey.300', mb: 2 }} />
@@ -333,7 +359,7 @@ function App() {
                   </Typography>
                   <Button 
                     variant="contained" 
-                    onClick={() => setActiveTab(0)}
+                    onClick={() => setActiveTab(1)} // Go to Voice Practice (tab 1)
                     startIcon={<MicIcon />}
                   >
                     Start Your First Practice
@@ -343,8 +369,8 @@ function App() {
             </Box>
           )}
 
-          {/* Tab 3: Progress Dashboard */}
-          {activeTab === 2 && (
+          {/* TAB 3: PROGRESS DASHBOARD */}
+          {activeTab === 3 && (
             <Box sx={{ p: 3 }}>
               <Typography variant="h5" gutterBottom color="primary" sx={{ mb: 3 }}>
                 📈 Progress Dashboard
@@ -353,8 +379,8 @@ function App() {
             </Box>
           )}
 
-          {/* Tab 4: Voice Settings */}
-          {activeTab === 3 && (
+          {/* TAB 4: VOICE SETTINGS */}
+          {activeTab === 4 && (
             <Box sx={{ p: 3 }}>
               <Typography variant="h5" gutterBottom color="primary" sx={{ mb: 3 }}>
                 🎭 Voice Settings
@@ -371,8 +397,8 @@ function App() {
             </Box>
           )}
 
-          {/* Tab 5: Reports */}
-          {activeTab === 4 && (
+          {/* TAB 5: REPORTS */}
+          {activeTab === 5 && (
             <Box sx={{ p: 3 }}>
               <Typography variant="h5" gutterBottom color="primary" sx={{ mb: 3 }}>
                 📊 Progress Reports & Export
@@ -440,6 +466,7 @@ function App() {
             <Chip label="Google Cloud" color="warning" variant="outlined" />
             <Chip label="Real-time Analysis" color="info" variant="outlined" />
             <Chip label="Progress Tracking" color="error" variant="outlined" />
+            <Chip label="AI Conversation" color="primary" variant="outlined" />
           </Box>
         </Paper>
 

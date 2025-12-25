@@ -1,19 +1,22 @@
 # backend/main.py
 import os
+import json
+import time
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from pydantic import BaseModel
+from typing import Optional
+import uvicorn
+from datetime import datetime
+
 from config.settings import settings
 from services.gemini_service import gemini_service
 from services.elevenlabs_service import elevenlabs_service
 from services.firebase_service import firebase_service
 from services.comparison_service import comparison_service
-from pydantic import BaseModel
-from typing import Optional
-import uvicorn
 from services.virtual_meeting_service import virtual_meeting_service
-from datetime import datetime
-import time
+from services.conversation_service import conversation_service  # Added import
 
 # ---------------------------------------------------------
 # Pydantic Models
@@ -21,6 +24,11 @@ import time
 class ComparisonRequest(BaseModel):
     text: str
     professional_id: Optional[str] = None
+
+class ConversationRequest(BaseModel):
+    message: str
+    history: Optional[list] = []
+    mode: Optional[str] = "speaking_practice"
 
 # ---------------------------------------------------------
 # FastAPI App
@@ -68,6 +76,10 @@ def read_root():
             "debug_gemini": "/debug/gemini",
             "test_elevenlabs": "/test/elevenlabs",
             "analyze": "/api/analyze/{text}",
+            "conversation": "/api/conversation",
+            "conversation_start": "/api/conversation/start",
+            "conversation_respond": "/api/conversation/respond",
+            "conversation_topics": "/api/conversation/topics",
             "compare": "/api/compare-with-pro",
             "professional_speeches": "/api/professional-speeches"
         }
@@ -154,6 +166,306 @@ async def analyze_text_post(data: dict):
         "feedback": feedback,
         "analysis_type": "speech_coaching"
     }
+
+# ---------------------------------------------------------
+# Conversation Endpoints
+# ---------------------------------------------------------
+
+# Original conversation endpoint
+@app.post("/api/conversation")
+async def conversation_endpoint(data: dict):
+    """Conversational AI endpoint using Gemini for speaking practice"""
+    try:
+        user_message = data.get("message", "")
+        history = data.get("history", [])
+        mode = data.get("mode", "speaking_practice")
+        
+        if not user_message:
+            raise HTTPException(status_code=400, detail="Message is required")
+        
+        # Prepare conversation context
+        conversation_context = ""
+        if history:
+            # Get last 6 messages (3 exchanges) for context
+            recent_history = history[-6:] if len(history) > 6 else history
+            for msg in recent_history:
+                speaker = "User" if msg.get("speaker") == "user" else "Coach"
+                conversation_context += f"{speaker}: {msg.get('text', '')}\n"
+        
+        # Different prompts based on mode
+        if mode == "speaking_practice":
+            system_prompt = """You are Alex, a friendly and encouraging speaking coach. 
+            You help people improve their public speaking, presentation skills, and communication.
+            
+            Your style:
+            - Always positive and supportive
+            - Give specific, actionable feedback
+            - Ask follow-up questions to encourage practice
+            - Use examples and metaphors
+            - Focus on one improvement at a time
+            
+            When analyzing speech:
+            1. First, acknowledge what they did well
+            2. Then suggest one specific improvement
+            3. Ask a question to continue the conversation
+            
+            Keep responses conversational and under 3 sentences."""
+        elif mode == "interview_practice":
+            system_prompt = """You are Alex, an interview coach specializing in job interviews.
+            You help people practice common interview questions and improve their answers.
+            
+            Your approach:
+            - Simulate real interview scenarios
+            - Provide feedback on STAR method responses
+            - Suggest improvements to answer structure
+            - Give tips on confidence and delivery
+            
+            Ask interview questions and provide constructive feedback."""
+        else:
+            system_prompt = """You are Alex, a communication coach helping with various speaking situations."""
+        
+        # Build the full prompt
+        full_prompt = f"""{system_prompt}
+
+        Conversation History:
+        {conversation_context}
+
+        User: {user_message}
+
+        Coach Alex:"""
+        
+        # Get response from Gemini
+        try:
+            response = await gemini_service.model.generate_content_async(full_prompt)
+            ai_response = response.text.strip()
+        except Exception as e:
+            # Fallback response if Gemini fails
+            print(f"Gemini conversation error: {e}")
+            ai_response = "I appreciate you sharing that! As your speaking coach, I'd love to hear more about your speaking goals. What specific area would you like to improve today?"
+        
+        # Extract speaking feedback if applicable
+        speaking_feedback = extract_speaking_feedback(ai_response, user_message)
+        
+        # Save conversation to database if long enough
+        if len(user_message) > 5:
+            try:
+                conversation_data = {
+                    "user_id": "demo_user",
+                    "user_message": user_message,
+                    "ai_response": ai_response,
+                    "mode": mode,
+                    "timestamp": datetime.now().isoformat(),
+                    "feedback_notes": speaking_feedback
+                }
+                firebase_service.save_conversation(conversation_data)
+            except Exception as e:
+                print(f"Failed to save conversation: {e}")
+        
+        return {
+            "text": ai_response,
+            "feedback": speaking_feedback,
+            "is_coaching": True,
+            "mode": mode,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"Conversation endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=f"Conversation error: {str(e)}")
+
+# New conversation endpoints
+@app.post("/api/conversation/start")
+async def start_conversation():
+    """Start a new conversation with the AI coach"""
+    try:
+        welcome_message = "Hello! I'm Alex, your speaking coach. What would you like to practice today?"
+        
+        # Create initial conversation record
+        conversation_data = {
+            "user_id": "demo_user",
+            "session_id": f"session_{int(time.time())}",
+            "start_time": datetime.now().isoformat(),
+            "coach_name": "Alex",
+            "welcome_message": welcome_message
+        }
+        
+        # Save to database if service available
+        try:
+            firebase_service.save_conversation_session(conversation_data)
+        except:
+            pass  # Continue even if save fails
+        
+        return {
+            "message": welcome_message,
+            "coach_name": "Alex",
+            "tips": ["Speak naturally", "Don't rush your words", "Focus on one improvement at a time"],
+            "welcome": True,
+            "session_id": conversation_data["session_id"],
+            "timestamp": conversation_data["start_time"]
+        }
+    except Exception as e:
+        print(f"Start conversation error: {e}")
+        # Fallback response
+        return {
+            "message": "Hello! I'm Alex, your speaking coach. Ready to practice your speaking skills?",
+            "coach_name": "Alex",
+            "tips": ["Take a deep breath before speaking", "Speak clearly and confidently"],
+            "welcome": True,
+            "session_id": f"fallback_{int(time.time())}",
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.post("/api/conversation/respond")
+async def conversation_respond(data: dict):
+    """Get AI coach response to user message"""
+    try:
+        user_message = data.get("message", "")
+        history = data.get("history", [])
+        
+        if not user_message or len(user_message) < 3:
+            return {
+                "text": "I didn't catch that. Could you please repeat or speak a bit louder?",
+                "coach_name": "Alex",
+                "coaching_tips": ["Speak clearly", "Project your voice"],
+                "requires_response": True,
+                "analysis": {"confidence_score": 5, "suggestion": "Speak more confidently"}
+            }
+        
+        # Get coaching response from conversation service
+        try:
+            response = await conversation_service.get_coaching_response(user_message, history)
+        except Exception as e:
+            print(f"Conversation service error, using fallback: {e}")
+            # Fallback response
+            response = {
+                "text": f"Thanks for sharing that! '{user_message[:50]}...' - Let's practice making your points more impactful. Try saying that again with more emphasis on the key words.",
+                "coach_name": "Alex",
+                "coaching_tips": ["Emphasize important words", "Use pauses for effect"],
+                "requires_response": True
+            }
+        
+        # Get quick analysis using conversation service
+        try:
+            analysis = await conversation_service.analyze_speaking_pattern(user_message)
+            response["quick_analysis"] = analysis
+        except Exception as e:
+            print(f"Analysis error: {e}")
+            # Fallback analysis
+            response["quick_analysis"] = {
+                "confidence_score": 7,
+                "clarity_score": 6,
+                "pace": "medium",
+                "suggestion": "Try to vary your pace for better engagement"
+            }
+        
+        # Save conversation to history
+        conversation_entry = {
+            "user_message": user_message,
+            "ai_response": response.get("text", ""),
+            "timestamp": datetime.now().isoformat(),
+            "analysis": response.get("quick_analysis", {})
+        }
+        
+        try:
+            firebase_service.save_conversation_entry(conversation_entry)
+        except:
+            pass  # Continue even if save fails
+        
+        return response
+        
+    except Exception as e:
+        print(f"Conversation respond error: {e}")
+        raise HTTPException(status_code=500, detail=f"Conversation error: {str(e)}")
+
+@app.get("/api/conversation/topics")
+async def get_conversation_topics():
+    """Get suggested conversation topics"""
+    topics = [
+        {
+            "id": "introduction", 
+            "name": "Introduce yourself", 
+            "prompt": "Tell me about yourself in 30 seconds",
+            "difficulty": "beginner",
+            "estimated_time": "1-2 minutes",
+            "skills": ["clarity", "conciseness", "confidence"]
+        },
+        {
+            "id": "elevator_pitch", 
+            "name": "Practice elevator pitch", 
+            "prompt": "Pitch your favorite project or idea in 60 seconds",
+            "difficulty": "intermediate",
+            "estimated_time": "2-3 minutes",
+            "skills": ["persuasion", "storytelling", "enthusiasm"]
+        },
+        {
+            "id": "difficult_topic", 
+            "name": "Explain a complex topic", 
+            "prompt": "Explain AI or another complex topic to a 10-year-old",
+            "difficulty": "advanced",
+            "estimated_time": "3-4 minutes",
+            "skills": ["simplification", "analogies", "clarity"]
+        },
+        {
+            "id": "storytelling", 
+            "name": "Tell a personal story", 
+            "prompt": "Share a story about a challenge you overcame",
+            "difficulty": "intermediate",
+            "estimated_time": "2-3 minutes",
+            "skills": ["emotion", "pacing", "engagement"]
+        },
+        {
+            "id": "opinion_piece", 
+            "name": "Share an opinion", 
+            "prompt": "Share your opinion on a topic you're passionate about",
+            "difficulty": "intermediate",
+            "estimated_time": "2-3 minutes",
+            "skills": ["conviction", "structure", "persuasion"]
+        },
+        {
+            "id": "job_interview", 
+            "name": "Job interview practice", 
+            "prompt": "Why should we hire you for your dream job?",
+            "difficulty": "advanced",
+            "estimated_time": "3-4 minutes",
+            "skills": ["professionalism", "confidence", "specificity"]
+        }
+    ]
+    return {
+        "topics": topics,
+        "total": len(topics),
+        "categories": ["beginner", "intermediate", "advanced"]
+    }
+
+def extract_speaking_feedback(ai_response: str, user_message: str) -> str:
+    """Extract specific speaking feedback from AI response"""
+    feedback_keywords = [
+        "speak", "present", "voice", "pace", "pause", "confidence",
+        "clarity", "articulate", "pronounce", "volume", "tone",
+        "body language", "eye contact", "nervous", "anxious",
+        "practice", "improve", "better", "suggestion", "tip"
+    ]
+    
+    user_lower = user_message.lower()
+    ai_lower = ai_response.lower()
+    
+    # Check if conversation is about speaking
+    is_speaking_topic = any(keyword in user_lower for keyword in feedback_keywords)
+    
+    if is_speaking_topic:
+        # Try to extract the most actionable feedback
+        sentences = ai_response.split('.')
+        for sentence in sentences:
+            sentence_lower = sentence.lower()
+            if any(keyword in sentence_lower for keyword in ['try', 'suggest', 'recommend', 'practice', 'improve']):
+                return sentence.strip()
+        
+        # Fallback to first sentence that contains feedback
+        for sentence in sentences:
+            if any(keyword in sentence.lower() for keyword in feedback_keywords):
+                return sentence.strip()
+    
+    # Default generic feedback
+    return "Great job engaging in speaking practice! Keep working on clear communication."
 
 # ---------------------------------------------------------
 # ElevenLabs Endpoints
@@ -391,8 +703,8 @@ async def compare_with_professional(data: dict):
             "improvement_areas": ["Pacing", "Confidence", "Storytelling"],
             "professional_tips": [
                 "Use dramatic pauses for emphasis",
-                "Tell personal stories to connect",
-                "Repeat key phrases for impact"
+    "Tell personal stories to connect",
+    "Repeat key phrases for impact"
             ],
             "is_mock": False
         }
