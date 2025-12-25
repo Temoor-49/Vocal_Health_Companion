@@ -63,6 +63,7 @@ const ConversationCoach = ({ backendUrl }) => {
       };
       
       setConversation([welcomeMessage]);
+      setCurrentTopic(null);
       
       // Speak the welcome message
       speakMessage(data.message);
@@ -114,12 +115,15 @@ const ConversationCoach = ({ backendUrl }) => {
           const formData = new FormData();
           formData.append('file', audioBlob, 'conversation.wav');
           
+          console.log("🎤 Sending audio for transcription...");
           const transcribeResponse = await fetch(`${backendUrl}/api/speech-to-text`, {
             method: 'POST',
             body: formData,
           });
           
           const transcribeData = await transcribeResponse.json();
+          console.log("📝 Transcription result:", transcribeData);
+          
           const transcribedText = transcribeData.text || "I didn't catch that clearly. Could you please repeat?";
           
           await processUserMessage(transcribedText);
@@ -155,6 +159,11 @@ const ConversationCoach = ({ backendUrl }) => {
     
     setIsProcessing(true);
     
+    // Log what's being sent
+    console.log("📤 Sending to AI:", text);
+    console.log("📊 Current conversation length:", conversation.length);
+    console.log("📋 Conversation history:", conversation);
+    
     // Add user message to conversation
     const userMessage = {
       speaker: 'user',
@@ -171,11 +180,13 @@ const ConversationCoach = ({ backendUrl }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
-          history: conversation
+          history: conversation  // Send current conversation state
         })
       });
       
+      console.log("🔄 Response status:", response.status);
       const aiResponse = await response.json();
+      console.log("📥 Received from AI:", aiResponse);
       
       // Add AI response to conversation
       const aiMessage = {
@@ -186,18 +197,20 @@ const ConversationCoach = ({ backendUrl }) => {
           confidence_score: 7,
           clarity_score: 6,
           pace: "medium",
-          suggestion: "Try to vary your pace for better engagement"
+          suggestion: "Try to vary your pace for better engagement",
+          follow_up_question: "What would you like to practice next?"
         },
         timestamp: new Date().toISOString()
       };
       
       setConversation(prev => [...prev, aiMessage]);
+      console.log("✅ Added AI response to conversation");
       
       // Speak the AI response
-      speakMessage(aiMessage.text);
+      speakMessage(aiResponse.text || aiMessage.text);
       
     } catch (error) {
-      console.error('Error processing message:', error);
+      console.error('❌ Error processing message:', error);
       
       // Fallback AI response
       const fallbackMessage = {
@@ -208,7 +221,8 @@ const ConversationCoach = ({ backendUrl }) => {
           confidence_score: 6,
           clarity_score: 7,
           pace: "normal",
-          suggestion: "Great start! Keep practicing regularly."
+          suggestion: "Great start! Keep practicing regularly.",
+          follow_up_question: "How did that feel to say?"
         },
         timestamp: new Date().toISOString()
       };
@@ -217,10 +231,11 @@ const ConversationCoach = ({ backendUrl }) => {
       speakMessage(fallbackMessage.text);
     } finally {
       setIsProcessing(false);
+      console.log("🏁 Processing complete");
     }
   };
 
-  const speakMessage = (text) => {
+  const speakMessage = useCallback((text) => {
     if ('speechSynthesis' in window) {
       setIsSpeaking(true);
       
@@ -245,18 +260,28 @@ const ConversationCoach = ({ backendUrl }) => {
         utterance.volume = 1.0;
       }
       
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
+      utterance.onend = () => {
+        console.log("🔊 Speech synthesis ended");
+        setIsSpeaking(false);
+      };
+      
+      utterance.onerror = (error) => {
+        console.error("🔊 Speech synthesis error:", error);
+        setIsSpeaking(false);
+      };
+      
+      console.log("🔊 Speaking AI response:", text.substring(0, 50) + "...");
       
       // Small delay to ensure previous speech is cancelled
       setTimeout(() => {
         window.speechSynthesis.speak(utterance);
       }, 100);
     }
-  };
+  }, []);
 
-  // FIXED: Changed function name from useTopic to selectTopic
-  const selectTopic = (topic) => {
+  // Select a conversation topic
+  const selectTopic = useCallback((topic) => {
+    console.log("🎯 Selected topic:", topic);
     setCurrentTopic(topic);
     
     const topicMessage = {
@@ -268,17 +293,33 @@ const ConversationCoach = ({ backendUrl }) => {
     
     setConversation(prev => [...prev, topicMessage]);
     speakMessage(`Great choice! Let's practice ${topic.name.toLowerCase()}. ${topic.prompt}`);
-  };
+  }, [speakMessage]);
 
   const sendTextMessage = () => {
     const text = prompt("Enter your message (for testing):");
     if (text) {
+      console.log("⌨️ Text input:", text);
       processUserMessage(text);
     }
   };
 
   const restartConversation = () => {
+    console.log("🔄 Restarting conversation");
     startNewConversation();
+  };
+
+  const handleQuickResponse = (responseType) => {
+    const quickResponses = {
+      greeting: "Hello! I'm excited to practice speaking with you today.",
+      nervous: "I feel a bit nervous about speaking in public. Can you help me with that?",
+      feedback: "Could you give me feedback on how I'm speaking right now?",
+      practice: "I'd like to practice introducing myself for a job interview."
+    };
+    
+    if (quickResponses[responseType]) {
+      console.log("⚡ Quick response:", responseType);
+      processUserMessage(quickResponses[responseType]);
+    }
   };
 
   return (
@@ -331,6 +372,38 @@ const ConversationCoach = ({ backendUrl }) => {
             </Box>
           </Paper>
         )}
+
+        {/* Quick Response Buttons */}
+        <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Chip
+            label="Say hello 👋"
+            onClick={() => handleQuickResponse('greeting')}
+            color="primary"
+            variant="outlined"
+            size="small"
+          />
+          <Chip
+            label="I'm nervous 😰"
+            onClick={() => handleQuickResponse('nervous')}
+            color="secondary"
+            variant="outlined"
+            size="small"
+          />
+          <Chip
+            label="Get feedback 📝"
+            onClick={() => handleQuickResponse('feedback')}
+            color="info"
+            variant="outlined"
+            size="small"
+          />
+          <Chip
+            label="Interview practice 💼"
+            onClick={() => handleQuickResponse('practice')}
+            color="success"
+            variant="outlined"
+            size="small"
+          />
+        </Box>
 
         {/* Conversation Messages */}
         <Box sx={{ mb: 4 }}>
@@ -403,7 +476,10 @@ const ConversationCoach = ({ backendUrl }) => {
                       <Paper sx={{ mt: 1, p: 1, bgcolor: 'warning.light', borderRadius: 1 }}>
                         <Typography variant="caption" fontWeight={600}>
                           <AutoAwesomeIcon sx={{ fontSize: '0.8rem', mr: 0.5 }} />
-                          Quick Tip: {msg.quickAnalysis.suggestion || "Great effort! Keep practicing."}
+                          Quick Analysis:
+                        </Typography>
+                        <Typography variant="caption" display="block">
+                          {msg.quickAnalysis.suggestion || "Great effort! Keep practicing."}
                         </Typography>
                         {msg.quickAnalysis.confidence_score && (
                           <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
@@ -449,7 +525,6 @@ const ConversationCoach = ({ backendUrl }) => {
                 <Chip
                   key={topic.id}
                   label={topic.name}
-                  // FIXED: Changed from useTopic to selectTopic
                   onClick={() => selectTopic(topic)}
                   variant={currentTopic?.id === topic.id ? "filled" : "outlined"}
                   color="primary"
@@ -534,7 +609,7 @@ const ConversationCoach = ({ backendUrl }) => {
           sx={{ ml: 'auto' }}
           disabled={isProcessing}
         >
-          Text Input (Test)
+          Text Input
         </Button>
       </Box>
     </Paper>
