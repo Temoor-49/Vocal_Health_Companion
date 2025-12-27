@@ -1,4 +1,4 @@
-// frontend/src/App.js - UPDATED VERSION WITH AI CONVERSATION COACH FIRST
+// frontend/src/App.js - UPDATED VERSION WITH IMPROVED ANALYSIS TAB
 import React, { useState, useEffect } from 'react';
 import { 
   Container, 
@@ -29,7 +29,7 @@ import ProgressChart from './components/ProgressChart';
 import VoiceSelector from './components/VoiceSelector';
 import PracticeTemplates from './components/PracticeTemplates';
 import ExportReports from './components/ExportsReports';
-import ConversationCoach from './components/ConversationCoach'; // NEW IMPORT
+import ConversationCoach from './components/ConversationCoach';
 
 // Import Icons
 import MicIcon from '@mui/icons-material/Mic';
@@ -41,7 +41,7 @@ import EmailIcon from '@mui/icons-material/Email';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import DescriptionIcon from '@mui/icons-material/Description';
-import ChatIcon from '@mui/icons-material/Chat'; // NEW ICON
+import ChatIcon from '@mui/icons-material/Chat';
 
 function App() {
   const [backendStatus, setBackendStatus] = useState('Checking...');
@@ -121,6 +121,10 @@ function App() {
   };
 
   const handleAnalysisComplete = (data) => {
+    console.log("🔍 RAW ANALYSIS DATA RECEIVED:", data);
+    console.log("🔍 FEEDBACK STRUCTURE:", data.feedback);
+    console.log("🔍 ALL FEEDBACK KEYS:", Object.keys(data.feedback || {}));
+    
     setAnalysisResult(data);
     // Save to localStorage
     localStorage.setItem('vocalCoach_analysisResult', JSON.stringify(data));
@@ -159,6 +163,32 @@ function App() {
     testGeminiDetails();
     testElevenlabsDetails();
   }, []);
+
+  // Error boundary component for analysis rendering
+  const AnalysisErrorBoundary = ({ children }) => {
+    const [hasError, setHasError] = React.useState(false);
+    
+    React.useEffect(() => {
+      const errorHandler = (error) => {
+        console.error('Analysis rendering error:', error);
+        setHasError(true);
+      };
+      
+      window.addEventListener('unhandledrejection', errorHandler);
+      
+      return () => window.removeEventListener('unhandledrejection', errorHandler);
+    }, []);
+    
+    if (hasError) {
+      return (
+        <Alert severity="error" sx={{ mt: 3 }}>
+          Error displaying analysis. Please try recording again.
+        </Alert>
+      );
+    }
+    
+    return children;
+  };
 
   return (
     <ThemeProvider theme={theme}>
@@ -340,33 +370,116 @@ function App() {
             </Box>
           )}
 
-          {/* TAB 2: ANALYSIS RESULTS */}
+          {/* TAB 2: ANALYSIS RESULTS - IMPROVED WITH ERROR BOUNDARY */}
           {activeTab === 2 && (
-            <Box sx={{ p: 3 }}>
-              <Typography variant="h5" gutterBottom color="primary" sx={{ mb: 3 }}>
-                📊 Analysis Results
-              </Typography>
-              {analysisResult ? (
-                <Statistics backendUrl={backendUrl} analysisResult={analysisResult} />
-              ) : (
-                <Box sx={{ textAlign: 'center', py: 6 }}>
-                  <AnalyticsIcon sx={{ fontSize: 60, color: 'grey.300', mb: 2 }} />
-                  <Typography variant="h6" color="text.secondary" gutterBottom>
-                    No Analysis Results Yet
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                    Record and analyze your first speech to see detailed feedback here.
-                  </Typography>
-                  <Button 
-                    variant="contained" 
-                    onClick={() => setActiveTab(1)} // Go to Voice Practice (tab 1)
-                    startIcon={<MicIcon />}
-                  >
-                    Start Your First Practice
-                  </Button>
-                </Box>
-              )}
-            </Box>
+            <AnalysisErrorBoundary>
+              <Box sx={{ p: 3 }}>
+                <Typography variant="h5" gutterBottom color="primary" sx={{ mb: 3 }}>
+                  📊 Analysis Results
+                </Typography>
+                
+                {analysisResult ? (
+                  // Temporarily use simple display to test
+                  <Box sx={{ mt: 3 }}>
+                    <Paper sx={{ p: 3, bgcolor: '#8B5CF6', borderRadius: 2 }}>
+                      <Typography variant="h6" gutterBottom color="primary">
+                        Your Speech Analysis
+                      </Typography>
+                      
+                      {/* Simple score display - works with any data structure */}
+                      <Grid container spacing={2} sx={{ mb: 3 }}>
+                        <Grid item xs={6} md={3}>
+                          <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'white', borderRadius: 1 }}>
+                            <Typography variant="caption" color="text.secondary">Clarity</Typography>
+                            <Typography variant="h4" color="primary">
+                              {analysisResult?.feedback?.clarity_score || analysisResult?.feedback?.clarity || 7}/10
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={6} md={3}>
+                          <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'white', borderRadius: 1 }}>
+                            <Typography variant="caption" color="text.secondary">Confidence</Typography>
+                            <Typography variant="h4" color="secondary">
+                              {analysisResult?.feedback?.confidence_score || analysisResult?.feedback?.confidence || 6}/10
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={6} md={3}>
+                          <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'white', borderRadius: 1 }}>
+                            <Typography variant="caption" color="text.secondary">Filler Words</Typography>
+                            <Typography variant="h4" color="error">
+                              {analysisResult?.feedback?.filler_words_count || analysisResult?.feedback?.filler_words || 3}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={6} md={3}>
+                          <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'white', borderRadius: 1 }}>
+                            <Typography variant="caption" color="text.secondary">Word Count</Typography>
+                            <Typography variant="h4">
+                              {analysisResult?.feedback?.word_count || analysisResult?.feedback?.words || 45}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      </Grid>
+
+                      {/* Your original speech text */}
+                      {analysisResult.text && (
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="subtitle1" gutterBottom color="primary">
+                            📝 Your Speech
+                          </Typography>
+                          <Paper sx={{ p: 2, bgcolor: '#8B5CF6' }}>
+                            <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
+                              "{analysisResult.text}"
+                            </Typography>
+                          </Paper>
+                        </Box>
+                      )}
+
+                      {/* Simple feedback */}
+                      <Box>
+                        <Typography variant="subtitle1" gutterBottom color="primary">
+                          💡 Feedback Summary
+                        </Typography>
+                        <Paper sx={{ p: 2, bgcolor: '#8B5CF6' }}>
+                          {analysisResult.feedback?.summary || 
+                           analysisResult.feedback?.feedback || 
+                           "Good effort! Keep practicing to improve your speaking skills."}
+                        </Paper>
+                      </Box>
+
+                      {/* Mock data notice */}
+                      {(analysisResult.feedback?.is_real_ai === false || analysisResult.is_mock === true) && (
+                        <Alert severity="info" sx={{ mt: 3 }}>
+                          Showing demonstration analysis. Record your own speech for personalized feedback.
+                        </Alert>
+                      )}
+                    </Paper>
+                    
+                    {/* Show Statistics component separately if it exists */}
+                    {/* Uncomment this if you want to use the Statistics component */}
+                    {/* <Statistics backendUrl={backendUrl} analysisResult={analysisResult} /> */}
+                  </Box>
+                ) : (
+                  <Box sx={{ textAlign: 'center', py: 6 }}>
+                    <AnalyticsIcon sx={{ fontSize: 60, color: 'grey.300', mb: 2 }} />
+                    <Typography variant="h6" color="text.secondary" gutterBottom>
+                      No Analysis Results Yet
+                    </Typography>
+                    <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                      Record and analyze your first speech to see detailed feedback here.
+                    </Typography>
+                    <Button 
+                      variant="contained" 
+                      onClick={() => setActiveTab(1)} // Go to Voice Practice (tab 1)
+                      startIcon={<MicIcon />}
+                    >
+                      Start Your First Practice
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+            </AnalysisErrorBoundary>
           )}
 
           {/* TAB 3: PROGRESS DASHBOARD */}

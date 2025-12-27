@@ -2,7 +2,7 @@
 import os
 import json
 import time
-from fastapi import FastAPI, HTTPException, UploadFile, File, Query
+from fastapi import FastAPI, HTTPException, UploadFile, File, Query, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -16,7 +16,8 @@ from services.elevenlabs_service import elevenlabs_service
 from services.firebase_service import firebase_service
 from services.comparison_service import comparison_service
 from services.virtual_meeting_service import virtual_meeting_service
-from services.conversation_service import conversation_service  # Added import
+from services.conversation_service import conversation_service
+from services.practice_stt_service import practice_stt_service  # NEW IMPORT
 
 # ---------------------------------------------------------
 # Pydantic Models
@@ -81,7 +82,11 @@ def read_root():
             "conversation_respond": "/api/conversation/respond",
             "conversation_topics": "/api/conversation/topics",
             "compare": "/api/compare-with-pro",
-            "professional_speeches": "/api/professional-speeches"
+            "professional_speeches": "/api/professional-speeches",
+            "speech_to_text": "/api/speech-to-text",
+            "speech_to_text_conversation": "/api/speech-to-text-conversation",
+            "text_to_speech": "/api/text-to-speech",
+            "latest_analysis": "/api/latest-analysis"
         }
     }
 
@@ -496,19 +501,54 @@ async def text_to_speech(data: dict):
     else:
         raise HTTPException(status_code=500, detail="Failed to generate speech")
 
+# NEW ENDPOINT: Speech-to-text for PRACTICE sessions
 @app.post("/api/speech-to-text")
 async def speech_to_text(file: UploadFile = File(...)):
-    """Convert speech audio to text (mock for now)"""
+    """Convert speech audio to text FOR PRACTICE SESSIONS"""
     try:
+        # Read audio file
         audio_bytes = await file.read()
-        text = elevenlabs_service.speech_to_text(audio_bytes)
+        
+        # Use PRACTICE-specific STT (not conversation mock)
+        text = practice_stt_service.transcribe_practice_speech(audio_bytes)
+        
+        # Get recording quality info
+        quality = practice_stt_service.analyze_recording_quality(audio_bytes)
         
         return {
             "text": text,
-            "is_mock": True,
-            "note": "Using mock STT. Enable real ElevenLabs STT for production."
+            "is_mock": True,  # Still mock, but better mock
+            "recording_quality": quality,
+            "note": "Practice STT service - returns realistic practice speeches"
         }
     except Exception as e:
+        print(f"❌ Practice STT error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing audio: {str(e)}")
+
+# ORIGINAL ENDPOINT: Speech-to-text for conversation mode (kept for compatibility)
+@app.post("/api/speech-to-text-conversation")
+async def speech_to_text_conversation(
+    file: UploadFile = File(...), 
+    mode: str = Form("conversation")
+):
+    """Convert speech audio to text for CONVERSATION mode"""
+    try:
+        audio_bytes = await file.read()
+        
+        # Log file information
+        print(f"🎤 Conversation STT: {file.filename}, size: {len(audio_bytes)} bytes, mode: {mode}")
+        
+        # Use original ElevenLabs service for conversation
+        text = elevenlabs_service.speech_to_text(audio_bytes, mode)
+        
+        return {
+            "text": text,
+            "mode": mode,
+            "is_mock": True,
+            "note": f"Using mock STT in {mode} mode for conversation"
+        }
+    except Exception as e:
+        print(f"❌ Conversation STT error: {e}")
         raise HTTPException(status_code=500, detail=f"Error processing audio: {str(e)}")
 
 @app.get("/api/voices")
@@ -518,6 +558,26 @@ async def get_voices():
     return {
         "voices": voices,
         "total": len(voices)
+    }
+
+# ---------------------------------------------------------
+# Latest Analysis Endpoint
+# ---------------------------------------------------------
+@app.get("/api/latest-analysis")
+async def get_latest_analysis():
+    """Get latest analysis (mock for now)"""
+    return {
+        "text": "Sample analysis from recent practice",
+        "feedback": {
+            "clarity_score": 8,
+            "confidence_score": 7,
+            "filler_words_count": 2,
+            "word_count": 25,
+            "pace": "medium"
+        },
+        "is_mock": True,
+        "note": "Mock latest analysis",
+        "timestamp": datetime.now().isoformat()
     }
 
 # ---------------------------------------------------------

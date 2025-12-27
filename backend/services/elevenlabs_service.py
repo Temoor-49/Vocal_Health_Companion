@@ -60,16 +60,15 @@ class ElevenLabsService:
             return None
 
     # ------------------------------------------------------------------
-    # UPDATED speech_to_text METHOD
+    # UPDATED speech_to_text METHOD WITH MODE PARAMETER
     # ------------------------------------------------------------------
-    def speech_to_text(self, audio_bytes: bytes) -> Optional[str]:
+    def speech_to_text(self, audio_bytes: bytes, mode: str = "conversation") -> Optional[str]:
         """
         Convert speech audio to text using ElevenLabs
-        Note: ElevenLabs STT is in beta and may require different setup
-        For now, we'll use an IMPROVED mock version
+        mode: "conversation" for AI coach, "analysis" for voice practice analysis
         """
         # IMPORTANT: ElevenLabs STT requires specific model setup
-        # For hackathon demo, we'll return VARIED mock text
+        # For hackathon demo, we'll return IMPROVED mock text based on mode
         # Uncomment below for real implementation
         
         """
@@ -91,7 +90,13 @@ class ElevenLabsService:
             return None
         """
         
-        # IMPROVED mock implementation for conversation
+        # IMPROVED mock implementation with mode parameter
+        # If mode is "analysis", return consistent text for proper analysis
+        if mode == "analysis":
+            print("🎤 Mock STT (Analysis Mode): Returning placeholder for speech analysis")
+            return "This is a sample recorded speech about improving public speaking skills through regular practice and feedback."
+        
+        # For "conversation" mode - return varied conversation starters
         # Different conversation starters based on context
         mock_responses = [
             # Greetings
@@ -132,7 +137,7 @@ class ElevenLabsService:
         
         # Return random realistic text
         selected_text = random.choice(mock_responses)
-        print(f"⚠️ Mock STT: Returning '{selected_text}'")
+        print(f"🗣️ Mock STT (Conversation Mode): '{selected_text}'")
         return selected_text
     
     # ------------------------------------------------------------------
